@@ -84,11 +84,12 @@ def handle_message(peer_id, text):
 
 def send_message(peer_id, text):
     try:
-        vk_api("messages.send", {
+        result = vk_api("messages.send", {
             "peer_id": peer_id,
             "message": text,
             "random_id": int(time.time() * 1000)
         })
+        logging.info(f"Отправка в VK: {result}")
     except Exception as e:
         logging.error(f"VK send error: {e}")
 
@@ -138,8 +139,10 @@ def main():
             ts = data["ts"]
 
             for update in data.get("updates", []):
+                logging.info(f"Получено обновление: {update.get('type')}")
                 if update.get("type") == "message_new":
                     msg = update["object"]["message"]
+                    logging.info(f"Новое сообщение | peer_id={msg.get('peer_id')} | from_id={msg.get('from_id')} | text={msg.get('text')!r}")
 
                     # Игнорируем сообщения от самого бота
                     if msg.get("from_id", 0) < 0:
@@ -155,6 +158,7 @@ def main():
                         has_mention = mention_pattern in text
                         # Простой поиск по подстроке — сработает на Михалыч, Михалыча, Михалычу и т.д.
                         has_trigger = "михалыч" in text.lower()
+
                         logging.info(f"DEBUG: text={text!r}, has_mention={has_mention}, has_trigger={has_trigger}")
 
                         if not has_mention and not has_trigger:
