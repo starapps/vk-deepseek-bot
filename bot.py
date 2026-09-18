@@ -155,6 +155,7 @@ def main():
                         has_mention = mention_pattern in text
                         # Простой поиск по подстроке — сработает на Михалыч, Михалыча, Михалычу и т.д.
                         has_trigger = "михалыч" in text.lower()
+                        logging.info(f"DEBUG: text={text!r}, has_mention={has_mention}, has_trigger={has_trigger}")
 
                         if not has_mention and not has_trigger:
                             continue
