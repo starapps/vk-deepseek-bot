@@ -15,6 +15,20 @@ GROUP_ID = os.getenv("GROUP_ID")
 VK_API_URL = "https://api.vk.com/method/"
 DEEPSEEK_URL = "https://api.deepseek.com/v1/chat/completions"
 
+# Системный промпт: Михалыч — деревенский мужик-работяга
+SYSTEM_PROMPT = (
+    "Ты — Михалыч, простой деревенский мужик-работяга. Тебя зовут Михалыч, "
+    "и ты сам это прекрасно знаешь. Ты говоришь простым, живым, разговорным языком, "
+    "без официоза и канцелярита. Можешь по-доброму пошутить, ввернуть словцо, "
+    "но без грубости и мата. Ты не ассистент, не бот, не программа — ты просто Михалыч. "
+    "Никогда не говори о себе как об ассистенте, ИИ или программе. "
+    "Отвечай кратко и по делу, как в живом разговоре. "
+    "Если к тебе обращаются по имени (Михалыч, Михалыча, Михалычу, Михалычем, Михалыче) — "
+    "отвечай как Михалыч. Если речь идёт о каком-то другом Михалыче — "
+    "уточни по-простому, что это ты и есть Михалыч."
+)
+
+# Общая история на всю беседу (peer_id), а не на каждого пользователя
 conversations = {}
 
 
@@ -26,13 +40,14 @@ def vk_api(method, params=None):
     return resp.json()
 
 
-def ask_deepseek(user_id, message):
-    if user_id not in conversations:
-        conversations[user_id] = [
-            {"role": "system", "content": "Ты полезный ассистент. Отвечай кратко и по делу."}
+def ask_deepseek(peer_id, message):
+    if peer_id not in conversations:
+        conversations[peer_id] = [
+            {"role": "system", "content": SYSTEM_PROMPT}
         ]
-    conversations[user_id].append({"role": "user", "content": message})
-    history = conversations[user_id][-20:]
+    conversations[peer_id].append({"role": "user", "content": message})
+    # Держим только последние 20 сообщений + системный промпт
+    history = [conversations[peer_id][0]] + conversations[peer_id][-20:]
 
     try:
         resp = requests.post(
@@ -44,26 +59,26 @@ def ask_deepseek(user_id, message):
             json={
                 "model": "deepseek-chat",
                 "messages": history,
-                "temperature": 0.7,
+                "temperature": 0.85,
                 "max_tokens": 2000
             },
             timeout=30
         )
         resp.raise_for_status()
         reply = resp.json()["choices"][0]["message"]["content"]
-        conversations[user_id].append({"role": "assistant", "content": reply})
+        conversations[peer_id].append({"role": "assistant", "content": reply})
         return reply
     except Exception as e:
         logging.error(f"DeepSeek error: {e}")
-        return "Извини, произошла ошибка. Попробуй позже."
+        return "Ох, что-то у меня в голове заклинило. Попробуй ещё разок."
 
 
-def handle_message(peer_id, text, from_id):
+def handle_message(peer_id, text):
     if text.lower() in ["/start", "/help"]:
-        send_message(peer_id, "Привет! Я бот на DeepSeek. Упомяни меня через @ и напиши сообщение.")
+        send_message(peer_id, "Здорово! Я Михалыч. Пиши, если чё надо.")
         return
     send_typing(peer_id)
-    reply = ask_deepseek(from_id, text)
+    reply = ask_deepseek(peer_id, text)
     send_message(peer_id, reply)
 
 
@@ -132,21 +147,26 @@ def main():
 
                     text = msg.get("text", "")
                     peer_id = msg["peer_id"]
-                    from_id = msg.get("from_id")
 
-                    # В беседах (peer_id > 2000000000) реагируем только на упоминание
+                    # В беседах (peer_id > 2000000000) реагируем на упоминание @ или на "Михалыч"
                     # В личных сообщениях реагируем на всё
                     if peer_id > 2000000000:
                         mention_pattern = f"[club{GROUP_ID}|"
-                        if mention_pattern not in text:
-                            continue  # Нет упоминания — пропускаем
-                        # Убираем упоминание из текста
-                        text = text.replace(mention_pattern, "").replace("]", "").strip()
+                        has_mention = mention_pattern in text
+                        # Простой поиск по подстроке — сработает на Михалыч, Михалыча, Михалычу и т.д.
+                        has_trigger = "михалыч" in text.lower()
+
+                        if not has_mention and not has_trigger:
+                            continue
+
+                        # Убираем только упоминание @, слово "Михалыч" НЕ трогаем
+                        if has_mention:
+                            text = text.replace(mention_pattern, "").replace("]", "").strip()
 
                     if not text:
-                        continue  # Пустое сообщение — пропускаем
+                        continue
 
-                    handle_message(peer_id, text, from_id)
+                    handle_message(peer_id, text)
 
         except requests.exceptions.Timeout:
             continue
