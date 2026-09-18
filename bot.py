@@ -58,12 +58,12 @@ def ask_deepseek(user_id, message):
         return "Извини, произошла ошибка. Попробуй позже."
 
 
-def handle_message(peer_id, text):
+def handle_message(peer_id, text, from_id):
     if text.lower() in ["/start", "/help"]:
-        send_message(peer_id, "Привет! Я бот на DeepSeek. Просто напиши мне сообщение.")
+        send_message(peer_id, "Привет! Я бот на DeepSeek. Упомяни меня через @ и напиши сообщение.")
         return
     send_typing(peer_id)
-    reply = ask_deepseek(peer_id, text)
+    reply = ask_deepseek(from_id, text)
     send_message(peer_id, reply)
 
 
@@ -125,7 +125,28 @@ def main():
             for update in data.get("updates", []):
                 if update.get("type") == "message_new":
                     msg = update["object"]["message"]
-                    handle_message(msg["peer_id"], msg["text"])
+
+                    # Игнорируем сообщения от самого бота
+                    if msg.get("from_id", 0) < 0:
+                        continue
+
+                    text = msg.get("text", "")
+                    peer_id = msg["peer_id"]
+                    from_id = msg.get("from_id")
+
+                    # В беседах (peer_id > 2000000000) реагируем только на упоминание
+                    # В личных сообщениях реагируем на всё
+                    if peer_id > 2000000000:
+                        mention_pattern = f"[club{GROUP_ID}|"
+                        if mention_pattern not in text:
+                            continue  # Нет упоминания — пропускаем
+                        # Убираем упоминание из текста
+                        text = text.replace(mention_pattern, "").replace("]", "").strip()
+
+                    if not text:
+                        continue  # Пустое сообщение — пропускаем
+
+                    handle_message(peer_id, text, from_id)
 
         except requests.exceptions.Timeout:
             continue
