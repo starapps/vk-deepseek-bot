@@ -2,6 +2,7 @@ import os
 import time
 import logging
 import json
+import re
 from dotenv import load_dotenv
 import requests
 
@@ -91,7 +92,6 @@ def get_weather(city):
 
 
 def call_deepseek(payload, retries=2):
-    """Вызов DeepSeek с ретраями и увеличенным таймаутом."""
     last_error = None
     for attempt in range(retries):
         try:
@@ -122,7 +122,6 @@ def ask_deepseek(peer_id, message):
     conversations[peer_id].append({"role": "user", "content": message})
     history = [conversations[peer_id][0]] + conversations[peer_id][-20:]
 
-    # Если в сообщении есть слово "погод" — принудительно вызываем get_weather
     tool_choice = "auto"
     if "погод" in message.lower():
         tool_choice = {"type": "function", "function": {"name": "get_weather"}}
@@ -208,7 +207,6 @@ def get_longpoll_server():
 
 
 def extract_message_from_update(update):
-    """Извлекает сообщение из объекта обновления VK. Работает и для message_new, и для message_reply."""
     obj = update.get("object", {})
     if isinstance(obj, dict):
         if "message" in obj and isinstance(obj["message"], dict):
@@ -219,10 +217,8 @@ def extract_message_from_update(update):
 
 
 def process_message(msg, is_reply_event=False):
-    """Обрабатывает входящее сообщение."""
     from_id = msg.get("from_id", 0)
     if from_id < 0:
-        # Сообщение от самого сообщества (бота)
         return
 
     text = msg.get("text", "")
@@ -241,7 +237,6 @@ def process_message(msg, is_reply_event=False):
             f"is_reply_to_bot={is_reply_to_bot}, is_reply_event={is_reply_event}"
         )
 
-        # Для message_reply: обрабатываем только если это ответ на сообщение бота
         if is_reply_event and not is_reply_to_bot:
             logging.info("Пропущено: это reply не к сообщению бота")
             return
@@ -249,8 +244,9 @@ def process_message(msg, is_reply_event=False):
         if not has_mention and not has_trigger and not is_reply_to_bot:
             return
 
+        # Убираем упоминание целиком: [club123|@club123] или [club123|Название]
         if has_mention:
-            text = text.replace(mention_pattern, "").replace("]", "").strip()
+            text = re.sub(rf"\[club{GROUP_ID}\|[^\]]*\]", "", text).strip()
 
     if not text:
         return
