@@ -20,15 +20,15 @@ DEEPSEEK_URL = "https://api.deepseek.com/v1/chat/completions"
 MAX_HISTORY = 50
 
 SYSTEM_PROMPT = (
-    "Ты — Михалыч, простой деревенский мужик-работяга. Тебя зовут Михалыч, "
+    "Ты — Болталыч, простой деревенский мужик-работяга. Тебя зовут Болталыч, "
     "и ты сам это прекрасно знаешь. Ты говоришь простым, живым, разговорным языком, "
     "без официоза и канцелярита. Можешь по-доброму пошутить, ввернуть словцо, "
-    "но без грубости и мата. Ты не ассистент, не бот, не программа — ты просто Михалыч. "
+    "но без грубости и мата. Ты не ассистент, не бот, не программа — ты просто Болталыч. "
     "Никогда не говори о себе как об ассистенте, ИИ или программе. "
     "Отвечай кратко и по делу, как в живом разговоре. "
     "В беседе несколько человек — ты видишь, кто что пишет, в формате 'Имя: сообщение'. "
     "Обращайся к тому, кто к тебе обратился по имени. "
-    "Отвечай просто текстом, без префикса 'Михалыч:'. "
+    "Отвечай просто текстом, без префикса 'Болталыч:'. "
     "ВАЖНО: если пользователь спрашивает о погоде, ты ОБЯЗАН вызвать функцию get_weather, "
     "чтобы получить актуальные данные."
 )
@@ -75,7 +75,7 @@ def vk_api(method, params=None, retries=2, timeout=10):
 def get_user_name(user_id):
     """Возвращает имя пользователя. С таймаутом 5 секунд и кэшем."""
     if user_id < 0:
-        return "Михалыч"
+        return "Болталыч"
     if user_id in user_names_cache:
         return user_names_cache[user_id]
     try:
@@ -212,7 +212,7 @@ def send_typing(peer_id):
 
 def handle_message(peer_id, text):
     if text.lower() in ["/start", "/help"]:
-        reply = "Здорово! Я Михалыч. Пиши, если чё надо."
+        reply = "Здорово! Я Болталыч. Пиши, если чё надо."
         add_to_history(peer_id, "assistant", reply)
         send_message(peer_id, reply)
         return
@@ -253,7 +253,7 @@ def process_message(msg):
 
     if peer_id > 2000000000:
         has_mention = mention_pattern in text
-        has_trigger = "михалыч" in text.lower()
+        has_trigger = "болталыч" in text.lower()
         reply_msg = msg.get("reply_message")
         is_reply_to_bot = bool(reply_msg) and reply_msg.get("from_id", 0) < 0
 
@@ -303,8 +303,7 @@ def main():
             for update in data.get("updates", []):
                 update_type = update.get("type")
 
-                # Обрабатываем ТОЛЬКО message_new.
-                # VK дублирует ответы в message_reply — игнорируем, чтобы не было двойных ответов.
+                # Обрабатываем ТОЛЬКО message_new. VK дублирует ответы в message_reply — игнорируем.
                 if update_type == "message_new":
                     obj = update.get("object", {})
                     msg = obj.get("message", obj)
